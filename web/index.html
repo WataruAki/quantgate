@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuantGate</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">MLOPS WORKBENCH · VULTR AGENT RUSH</p>
+      <h1>QuantGate</h1>
+      <p>Test a model's activation formats against a storage and accuracy contract before release.</p>
+    </header>
+    <section class="panel" aria-labelledby="request-title">
+      <h2 id="request-title">Prompt</h2>
+      <p>Compare FP32, FP16, BF16 and INT8 on synthetic sensor data, or replay the Optical Digits release.</p>
+      <form id="prompt-form">
+        <div id="prompt-field">
+          <label for="release-goal">Describe the release goal</label>
+          <textarea id="release-goal" rows="4" maxlength="500" required placeholder="Compare FP32, FP16, BF16 and INT8 on the synthetic sensors. Budget 96 bytes per sample and allow 0.5 percentage points of accuracy loss."></textarea>
+        </div>
+        <div id="token-field" hidden>
+          <label for="token">Live demo token</label>
+          <input id="token" type="password" autocomplete="off">
+        </div>
+        <button id="run" disabled>Run evaluation</button>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+    <section class="panel" id="report" aria-labelledby="report-title" hidden>
+      <p class="eyebrow" id="verification"></p>
+      <h2 id="report-title">Release decision</h2>
+      <p id="recommendation"></p>
+      <p class="note" id="plan-contract"></p>
+      <p id="split-evidence"></p>
+      <section id="explanation-section" aria-labelledby="explanation-title" hidden>
+        <h3 id="explanation-title">Explanation by Vultr Inference</h3>
+        <p id="explanation"></p>
+      </section>
+      <details id="kernel" hidden>
+        <summary id="kernel-title">Scoring kernel</summary>
+        <pre id="source"></pre>
+      </details>
+      <div id="measurements" hidden>
+        <p id="comparison"></p>
+        <p class="note">Activation storage counts encoded values and excludes scale metadata. The formats are simulated at layer boundaries with shared arithmetic.</p>
+        <p id="timings"></p>
+        <div class="table-scroll" id="precision-comparison" hidden>
+          <table>
+            <caption>Holdout accuracy and change vs FP32</caption>
+            <thead><tr><th scope="col">Format</th><th scope="col">Bytes/sample</th><th scope="col">Standard</th><th scope="col">Low margin</th></tr></thead>
+            <tbody id="precision-rows"></tbody>
+          </table>
+        </div>
+        <div class="table-scroll" id="holdout" hidden>
+          <table>
+            <caption>Held-out predictions by input slice</caption>
+            <thead><tr><th scope="col">Slice</th><th scope="col">Candidate</th><th scope="col">FP16</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+      <details><summary>Execution trace</summary><ol id="trace"></ol></details>
+      <div class="actions">
+        <button id="download" type="button" class="secondary">Download JSON report</button>
+      </div>
+    </section>
+    <details class="panel" id="containment" hidden>
+      <summary>Containment probe</summary>
+      <p>Run a worker that waits indefinitely. QuantGate stops it after three seconds and verifies that the container was removed.</p>
+      <ul class="policy">
+        <li>Network disabled</li>
+        <li>512 MiB RAM and one CPU</li>
+        <li>Non-root process and read-only root filesystem</li>
+      </ul>
+      <button id="probe" type="button" class="secondary">Run timeout probe</button>
+      <p id="probe-status" role="status"></p>
+    </details>
+  </main>
+</body>
+</html>

@@ -1,0 +1,6 @@
+*
+!worker.py
+!digits.py
+!digits-data/
+!digits-data/*
+!Dockerfile
