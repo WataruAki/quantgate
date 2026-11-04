@@ -89,10 +89,12 @@ def verify_release(port, live, local):
                 and result["checks"]["network"]["verdict"] == "blocked"
                 and result["checks"]["filesystem"]["verdict"] == "blocked"
                 and result["checks"]["filesystem"]["tmpfs_write"]
+                and result["checks"]["disk"]["verdict"] == "blocked"
+                and result["checks"]["processes"]["verdict"] == "blocked"
                 and result["checks"]["timeout"].get("removed")
                 and result["checks"]["timeout"].get("probe_started"),
-                "Containment checks did not verify all three boundaries.")
-        print("PASS: HTTP network egress, read-only root and timeout cleanup probes.")
+                "Containment checks did not verify all five boundaries.")
+        print("PASS: HTTP network, read-only root, tmpfs quota, PID quota and timeout probes.")
 
 
 def verify_release_http(live, local):

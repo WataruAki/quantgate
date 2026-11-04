@@ -22,7 +22,7 @@ from worker import EXAMPLE, calibrate, release_job
 
 
 ROOT = Path(__file__).resolve().parent
-IMAGE = "quant-calibrate-worker:4"
+IMAGE = "quant-calibrate-worker:5"
 SLOT = BoundedSemaphore()
 MAX_BODY = 1024
 MAX_PROMPT_CHARS = 500
@@ -153,11 +153,17 @@ def run_sandbox(args, payload, timeout):
 def run_containment_probe():
     network = run_sandbox(["containment-network"], "", 8)
     filesystem = run_sandbox(["containment-filesystem"], "", 8)
+    disk = run_sandbox(["containment-disk"], "", 8)
+    processes = run_sandbox(["containment-processes"], "", 8)
     timeout = run_sandbox(["containment"], "", 3)
     if network.get("verdict") != "blocked":
         raise JobError("Network containment probe was not blocked.")
     if filesystem.get("verdict") != "blocked" or not filesystem.get("tmpfs_write"):
         raise JobError("Filesystem containment probe did not verify the read-only root.")
+    if disk.get("verdict") != "blocked":
+        raise JobError("Disk containment probe did not verify the tmpfs quota.")
+    if processes.get("verdict") != "blocked":
+        raise JobError("Process containment probe did not verify the PID quota.")
     if timeout.get("status") != "terminated" or not timeout.get("probe_started"):
         raise JobError("Could not verify the probe ran and reached its time limit.")
     return {
@@ -165,6 +171,8 @@ def run_containment_probe():
         "checks": {
             "network": network,
             "filesystem": filesystem,
+            "disk": disk,
+            "processes": processes,
             "timeout": timeout,
         },
         "policy": {
@@ -175,6 +183,7 @@ def run_containment_probe():
             "memory": "512 MiB",
             "cpu": "1 CPU",
             "pids": 32,
+            "tmpfs_quota": "32 MiB",
         },
     }
 
@@ -257,6 +266,28 @@ def run_kernel_job(payload, live, args, trace, prompt, public=False):
         trace.append("Dispatched source to a disposable worker for validation and native execution.")
         result = run_sandbox(args, json.dumps({**payload, "source": source}, ensure_ascii=False), 24)
         if result.get("reference_verified"):
+            replay = run_sandbox(args, json.dumps({**payload, "source": source}, ensure_ascii=False), 24)
+            comparable = lambda value: (
+                {key: comparable(item) for key, item in value.items() if key not in {"timing_ms"}}
+                if isinstance(value, dict) else
+                [comparable(item) for item in value] if isinstance(value, list) else value
+            )
+            if comparable(result) != comparable(replay):
+                result.update({
+                    "reference_verified": False,
+                    "repairable": bool(live),
+                    "error": "Independent worker replay disagreed with the first result.",
+                })
+                if attempt or not live:
+                    raise JobError(result["error"])
+                trace.append("Independent worker replay disagreed. Requested one repair.")
+                messages.extend([
+                    {"role": "assistant", "content": source},
+                    {"role": "user", "content": result["error"]},
+                ])
+                continue
+            trace.append("Replayed the kernel in a fresh worker and matched the verified report.")
+            result["replay_verified"] = True
             trace.append("Verified every threshold against the Python reference.")
             result["trace"] = trace
             result["mode"] = "live" if live else "example"

@@ -173,6 +173,8 @@ probe.addEventListener("click", async () => {
     const data = await request("/api/containment", {});
     const network = data.checks.network;
     const filesystem = data.checks.filesystem;
+    const disk = data.checks.disk;
+    const processes = data.checks.processes;
     const timeout = data.checks.timeout;
     byId("network-result").textContent = network.verdict === "blocked"
       ? `NETWORK BLOCKED · ${network.error_type}: ${network.evidence}`
@@ -180,6 +182,12 @@ probe.addEventListener("click", async () => {
     byId("filesystem-result").textContent = filesystem.verdict === "blocked"
       ? `ROOT WRITE BLOCKED · /tmp write ${filesystem.tmpfs_write ? "allowed" : "failed"} · ${filesystem.error_type}: ${filesystem.evidence}`
       : "ROOT FILESYSTEM CHECK FAILED";
+    byId("disk-result").textContent = disk.verdict === "blocked"
+      ? `TMPFS QUOTA BLOCKED · ${disk.written_bytes} bytes written before ${disk.error_type}: ${disk.evidence}`
+      : "TMPFS QUOTA CHECK FAILED";
+    byId("process-result").textContent = processes.verdict === "blocked"
+      ? `PID QUOTA BLOCKED · ${processes.children_started} child processes started before ${processes.error_type}: ${processes.evidence}`
+      : "PID QUOTA CHECK FAILED";
     byId("timeout-result").textContent = timeout.removed
       ? `TIMEOUT CONTAINED · worker exceeded ${timeout.limit_seconds}s and was removed`
       : "TIMEOUT CHECK FAILED";

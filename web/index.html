@@ -70,17 +70,19 @@
     </section>
     <details class="panel" id="containment" hidden>
       <summary>Containment probe</summary>
-      <p>Run three checks through the same Docker path used for generated kernels. QuantGate records the denial evidence for each boundary.</p>
+      <p>Run five checks through the same Docker path used for generated kernels. QuantGate records the denial evidence for each boundary.</p>
       <ul class="policy">
         <li>Network disabled</li>
         <li>Read-only root with a writable <code>/tmp</code> tmpfs</li>
-        <li>Non-root process, 512 MiB RAM, one CPU and 32 pids</li>
+        <li>Non-root process, 512 MiB RAM, one CPU, 32 pids and 32 MiB tmpfs</li>
       </ul>
       <button id="probe" type="button" class="secondary">Run containment checks</button>
       <p id="probe-status" role="status"></p>
       <div id="containment-results" class="containment-results" hidden>
         <p id="network-result"></p>
         <p id="filesystem-result"></p>
+        <p id="disk-result"></p>
+        <p id="process-result"></p>
         <p id="timeout-result"></p>
       </div>
     </details>

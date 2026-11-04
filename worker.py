@@ -3,6 +3,7 @@
 import ast
 import json
 import math
+import os
 from pathlib import Path
 import random
 import socket
@@ -256,6 +257,71 @@ def containment_filesystem():
     return {"verdict": "unexpectedly_allowed", "tmpfs_write": writable_path.exists()}
 
 
+def containment_disk():
+    """Prove that the writable tmpfs has a finite quota."""
+    path = Path("/tmp/quantgate-disk-probe.bin")
+    written = 0
+    try:
+        with path.open("wb") as stream:
+            chunk = b"q" * (1024 * 1024)
+            for _ in range(48):
+                stream.write(chunk)
+                stream.flush()
+                written += len(chunk)
+    except OSError as error:
+        return {
+            "verdict": "blocked",
+            "written_bytes": written,
+            "error_type": type(error).__name__,
+            "evidence": str(error)[:160],
+        }
+    finally:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+    return {"verdict": "unexpectedly_allowed", "written_bytes": written}
+
+
+def containment_processes():
+    """Prove that the worker cannot exceed the container process quota."""
+    children = []
+    try:
+        for _ in range(64):
+            child = os.fork()
+            if child == 0:
+                time.sleep(10)
+                os._exit(0)
+            children.append(child)
+    except OSError as error:
+        for child in children:
+            try:
+                os.kill(child, 9)
+            except OSError:
+                pass
+        for child in children:
+            try:
+                os.waitpid(child, 0)
+            except OSError:
+                pass
+        return {
+            "verdict": "blocked",
+            "children_started": len(children),
+            "error_type": type(error).__name__,
+            "evidence": str(error)[:160],
+        }
+    for child in children:
+        try:
+            os.kill(child, 9)
+        except OSError:
+            pass
+        try:
+            os.waitpid(child, 0)
+        except OSError:
+            pass
+    return {"verdict": "unexpectedly_allowed", "children_started": len(children)}
+
+
 def release_job(request, preflight=False):
     budget, loss, fixture = validate_contract(request)
     data = load_fixture(fixture)
@@ -283,6 +349,12 @@ def main():
         return
     if mode == ["containment-filesystem"]:
         print(json.dumps(containment_filesystem()), flush=True)
+        return
+    if mode == ["containment-disk"]:
+        print(json.dumps(containment_disk()), flush=True)
+        return
+    if mode == ["containment-processes"]:
+        print(json.dumps(containment_processes()), flush=True)
         return
     try:
         request = json.loads(sys.stdin.buffer.read(16_385))
