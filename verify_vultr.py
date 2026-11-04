@@ -85,10 +85,14 @@ def verify_release(port, live, local):
     print("PASS: HTTP synthetic four-format comparison and frozen-candidate rejection.")
     if not local:
         status, result = post(port, "/api/containment", {})
-        require(status == 200 and result.get("status") == "terminated"
-                and result.get("probe_started") and result.get("removed"),
-                "Timeout containment could not be verified.")
-        print("PASS: HTTP containment worker started, timed out and was removed.")
+        require(status == 200 and result.get("status") == "verified"
+                and result["checks"]["network"]["verdict"] == "blocked"
+                and result["checks"]["filesystem"]["verdict"] == "blocked"
+                and result["checks"]["filesystem"]["tmpfs_write"]
+                and result["checks"]["timeout"].get("removed")
+                and result["checks"]["timeout"].get("probe_started"),
+                "Containment checks did not verify all three boundaries.")
+        print("PASS: HTTP network egress, read-only root and timeout cleanup probes.")
 
 
 def verify_release_http(live, local):

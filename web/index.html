@@ -70,14 +70,19 @@
     </section>
     <details class="panel" id="containment" hidden>
       <summary>Containment probe</summary>
-      <p>Run a worker that waits indefinitely. QuantGate stops it after three seconds and verifies that the container was removed.</p>
+      <p>Run three checks through the same Docker path used for generated kernels. QuantGate records the denial evidence for each boundary.</p>
       <ul class="policy">
         <li>Network disabled</li>
-        <li>512 MiB RAM and one CPU</li>
-        <li>Non-root process and read-only root filesystem</li>
+        <li>Read-only root with a writable <code>/tmp</code> tmpfs</li>
+        <li>Non-root process, 512 MiB RAM, one CPU and 32 pids</li>
       </ul>
-      <button id="probe" type="button" class="secondary">Run timeout probe</button>
+      <button id="probe" type="button" class="secondary">Run containment checks</button>
       <p id="probe-status" role="status"></p>
+      <div id="containment-results" class="containment-results" hidden>
+        <p id="network-result"></p>
+        <p id="filesystem-result"></p>
+        <p id="timeout-result"></p>
+      </div>
     </details>
   </main>
 </body>

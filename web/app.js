@@ -171,7 +171,20 @@ probe.addEventListener("click", async () => {
   status.textContent = "Starting disposable worker…";
   try {
     const data = await request("/api/containment", {});
-    status.textContent = `Worker started, exceeded the ${data.limit_seconds}s deadline, and was removed.`;
+    const network = data.checks.network;
+    const filesystem = data.checks.filesystem;
+    const timeout = data.checks.timeout;
+    byId("network-result").textContent = network.verdict === "blocked"
+      ? `NETWORK BLOCKED · ${network.error_type}: ${network.evidence}`
+      : "NETWORK CHECK FAILED";
+    byId("filesystem-result").textContent = filesystem.verdict === "blocked"
+      ? `ROOT WRITE BLOCKED · /tmp write ${filesystem.tmpfs_write ? "allowed" : "failed"} · ${filesystem.error_type}: ${filesystem.evidence}`
+      : "ROOT FILESYSTEM CHECK FAILED";
+    byId("timeout-result").textContent = timeout.removed
+      ? `TIMEOUT CONTAINED · worker exceeded ${timeout.limit_seconds}s and was removed`
+      : "TIMEOUT CHECK FAILED";
+    byId("containment-results").hidden = false;
+    status.textContent = "All containment checks completed.";
   } catch (error) {
     status.textContent = error.message;
   } finally {

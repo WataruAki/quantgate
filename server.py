@@ -22,7 +22,7 @@ from worker import EXAMPLE, calibrate, release_job
 
 
 ROOT = Path(__file__).resolve().parent
-IMAGE = "quant-calibrate-worker:3"
+IMAGE = "quant-calibrate-worker:4"
 SLOT = BoundedSemaphore()
 MAX_BODY = 1024
 MAX_PROMPT_CHARS = 500
@@ -151,10 +151,32 @@ def run_sandbox(args, payload, timeout):
 
 
 def run_containment_probe():
-    result = run_sandbox(["containment"], "", 3)
-    if result.get("status") != "terminated" or not result.get("probe_started"):
+    network = run_sandbox(["containment-network"], "", 8)
+    filesystem = run_sandbox(["containment-filesystem"], "", 8)
+    timeout = run_sandbox(["containment"], "", 3)
+    if network.get("verdict") != "blocked":
+        raise JobError("Network containment probe was not blocked.")
+    if filesystem.get("verdict") != "blocked" or not filesystem.get("tmpfs_write"):
+        raise JobError("Filesystem containment probe did not verify the read-only root.")
+    if timeout.get("status") != "terminated" or not timeout.get("probe_started"):
         raise JobError("Could not verify the probe ran and reached its time limit.")
-    return result
+    return {
+        "status": "verified",
+        "checks": {
+            "network": network,
+            "filesystem": filesystem,
+            "timeout": timeout,
+        },
+        "policy": {
+            "network": "disabled",
+            "root_filesystem": "read-only",
+            "tmpfs": "/tmp only",
+            "user": "65534:65534",
+            "memory": "512 MiB",
+            "cpu": "1 CPU",
+            "pids": 32,
+        },
+    }
 
 
 def infer_text(messages, public=False, max_tokens=1024):

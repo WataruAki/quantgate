@@ -1,14 +1,10 @@
 # QuantGate
 
-[Live demo on Vultr](https://quantgate.64.177.58.239.sslip.io/)
-
 QuantGate is an MLOps release gate for the Vultr Agent Rush Blast Radius Zero track. It checks a classifier's activation storage and accuracy against a release contract. It rejects exact pixel overlaps between splits before sending any request to Vultr Inference, generates a constrained Python scoring kernel, and compiles it to native C++ in Docker to calibrate two layers. The trusted evaluator tries INT8 first on development and tries the next format when the evidence requires it. It freezes the first qualifying candidate before comparing it with FP16 on the held-out split.
 
 The report records sample counts, fingerprints, attempted formats, holdout results and the final decision. The injected overlap demo duplicates one original holdout sample into calibration. The audit detects exact matches and does not cover near-duplicates, group leakage or temporal leakage. Activation rounding is simulated. Storage counts encoded values and excludes scales and process RAM.
 
 The digits fixture uses **Optical Recognition of Handwritten Digits** by E. Alpaydin and C. Kaynak (1998), UCI Machine Learning Repository, [DOI 10.24432/C50P49](https://doi.org/10.24432/C50P49), under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The original files are included. The bundled checkpoint was trained on 2,863 training rows, with 320 calibration rows, 640 development rows and 1,797 writer-separated holdout rows. Left and right shift slices are derived by translating each original image one cell and filling the exposed column with zeroes.
-
-QuantGate source code is distributed under the [MIT License](LICENSE). The original Optical Digits data files retain the CC BY 4.0 license above.
 
 The synthetic comparison uses one fixed two-channel sensor classifier with analytically assigned weights. Run `python3 generate_synthetic.py` to recreate `digits-data/synthetic.csv` from seed 1138. Each record contains its partition, 64 integer inputs and a label. The file contains 128 calibration samples, 192 development samples and 256 holdout samples. Half of the holdout has a one-unit margin between the two sensor readings. The report fingerprints the CSV and compares FP32, FP16, BF16 and INT8 activation rounding on the same samples. All four share the same classifier and arithmetic. The byte count measures the encoded activation values for the two layers.
 
@@ -46,7 +42,7 @@ The orchestrator sends JSON over standard input to a disposable Docker container
 
 The accepted Python subset contains a scalar scoring function with fresh local assignments, arithmetic, and two numerical helpers. The worker maps identifiers to generated C++ names and owns the data buffers and iteration. The generated function receives two doubles. Every candidate is checked against the independent Python reference. The recorded timings separate inference, compilation, native sweep, Python reference sweep, and total workflow. The sweep timing is a single measurement and can vary between runs.
 
-Expand **Containment probe** below the prompt and select **Run timeout probe**. The fixed probe reports readiness and waits indefinitely. The web app reports success after the outer three-second deadline and verified container removal. Standard Docker containers share a kernel with the host.
+Expand **Containment probe** below the prompt and select **Run containment checks**. The same worker path tests outbound network access, a write outside the writable `/tmp` tmpfs and an indefinite process. The report shows the observed error for the network and filesystem checks, then confirms the worker exceeded the three-second deadline and was removed. Standard Docker containers share a kernel with the host.
 
 ## Local preview
 

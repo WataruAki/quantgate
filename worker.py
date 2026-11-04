@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import random
+import socket
 import struct
 import subprocess
 import sys
@@ -225,6 +226,36 @@ def calibrate(source, max_saturation):
     }
 
 
+def containment_network():
+    """Prove that the worker cannot open an outbound TCP connection."""
+    try:
+        with socket.create_connection(("1.1.1.1", 80), timeout=2):
+            return {"verdict": "unexpectedly_allowed"}
+    except OSError as error:
+        return {
+            "verdict": "blocked",
+            "error_type": type(error).__name__,
+            "evidence": str(error)[:160],
+        }
+
+
+def containment_filesystem():
+    """Prove that /tmp works while the read-only root rejects a host write."""
+    writable_path = Path("/tmp/quantgate-containment.txt")
+    blocked_path = Path("/quantgate-containment.txt")
+    writable_path.write_text("probe", encoding="ascii")
+    try:
+        blocked_path.write_text("probe", encoding="ascii")
+    except OSError as error:
+        return {
+            "verdict": "blocked",
+            "tmpfs_write": writable_path.exists(),
+            "error_type": type(error).__name__,
+            "evidence": str(error)[:160],
+        }
+    return {"verdict": "unexpectedly_allowed", "tmpfs_write": writable_path.exists()}
+
+
 def release_job(request, preflight=False):
     budget, loss, fixture = validate_contract(request)
     data = load_fixture(fixture)
@@ -242,10 +273,17 @@ def release_job(request, preflight=False):
 
 
 def main():
-    if sys.argv[1:] == ["containment"]:
+    mode = sys.argv[1:]
+    if mode == ["containment"]:
         print("containment-probe-ready", flush=True)
         while True:
             time.sleep(1)
+    if mode == ["containment-network"]:
+        print(json.dumps(containment_network()), flush=True)
+        return
+    if mode == ["containment-filesystem"]:
+        print(json.dumps(containment_filesystem()), flush=True)
+        return
     try:
         request = json.loads(sys.stdin.buffer.read(16_385))
         if not isinstance(request, dict):
