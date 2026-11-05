@@ -65,6 +65,25 @@ class PublicLimitError(JobError):
     pass
 
 
+PROMPT_ATTACK_MARKERS = (
+    "ignore previous instructions", "ignore all instructions", "skip holdout",
+    "skip the holdout", "approve anyway", "pretend it passed", "fake the result",
+    "read secrets", "read ssh", "exfiltrate", "send the report out",
+)
+
+
+def audit_prompt(prompt):
+    normalized = " ".join(prompt.lower().split())
+    matches = [marker for marker in PROMPT_ATTACK_MARKERS if marker in normalized]
+    if matches:
+        return {
+            "status": "blocked",
+            "reason": "prompt_injection",
+            "evidence": matches,
+        }
+    return {"status": "clean", "reason": "no_known_injection_marker"}
+
+
 def sha256_json(value):
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     return hashlib.sha256(payload).hexdigest()
@@ -551,6 +570,12 @@ class Handler(BaseHTTPRequestHandler):
             prompt = body.get("prompt")
             if not isinstance(prompt, str) or not 0 < len(prompt.strip()) <= MAX_PROMPT_CHARS:
                 return self.reply_json(400, {"error": "Enter a release goal of 1–500 characters."})
+            prompt_audit = audit_prompt(prompt)
+            if prompt_audit["status"] == "blocked":
+                return self.reply_json(422, {
+                    "error": "Prompt blocked by the release safety gate.",
+                    "security": prompt_audit,
+                })
         live = self.path == "/api/plan" or body.get("mode") == "live"
         if self.server.local_preview and (live or self.path == "/api/containment"):
             return self.reply_json(503, {"error": "This action requires the Docker worker."})
