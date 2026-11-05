@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import sqlite3
 import subprocess
 import sys
@@ -251,6 +252,25 @@ def parse_plan(raw):
     return {"fixture": fixture, "budget_bytes": budget, "max_drop_bps": loss}
 
 
+def parse_prompt_fallback(prompt):
+    """Recover a release contract from ordinary language when model JSON is malformed."""
+    text = prompt.lower().replace(",", " ")
+    if not any(word in text for word in ("quant", "precision", "fp32", "fp16", "bf16", "int8", "release", "optical", "digits")):
+        return None
+    fixture = "injected_overlap" if any(word in text for word in ("overlap", "leakage", "leak")) else "clean" if any(
+        word in text for word in ("optical", "digits", "original split", "handwritten")
+    ) else "synthetic"
+    budget_match = re.search(r"(\d+)\s*(?:encoded\s*)?(?:bytes?|b)\s*(?:per\s*sample|/\s*sample)?", text)
+    budget = int(budget_match.group(1)) if budget_match else (80 if fixture == "clean" else 96)
+    point_match = re.search(r"(?:allow|maximum|max|under|within|at most)?\s*(\d+(?:\.\d+)?)\s*(?:percentage|percent|%|pp)\s*(?:points?|point)?", text)
+    if point_match:
+        loss = round(float(point_match.group(1)) * 100)
+    else:
+        bps_match = re.search(r"(\d+)\s*(?:basis\s*points?|bps)", text)
+        loss = int(bps_match.group(1)) if bps_match else 50
+    return parse_plan(json.dumps({"fixture": fixture, "budget_bytes": budget, "max_drop_bps": loss}))
+
+
 def generate_plan(prompt, public):
     messages = [{"role": "system", "content": PLANNER_PROMPT}, {"role": "user", "content": prompt}]
     for attempt in range(2):
@@ -259,6 +279,9 @@ def generate_plan(prompt, public):
             return parse_plan(raw)
         except ValueError as error:
             if attempt:
+                fallback = parse_prompt_fallback(prompt)
+                if fallback:
+                    return fallback
                 raise JobError("Vultr returned an invalid plan. Try restating the release constraints.") from error
         messages.extend([
             {"role": "assistant", "content": raw},
