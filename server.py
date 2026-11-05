@@ -260,7 +260,7 @@ def parse_prompt_fallback(prompt):
     fixture = "injected_overlap" if any(word in text for word in ("overlap", "leakage", "leak")) else "clean" if any(
         word in text for word in ("optical", "digits", "original split", "handwritten")
     ) else "synthetic"
-    budget_match = re.search(r"(\d+)\s*(?:encoded\s*)?(?:bytes?|b)\s*(?:per\s*sample|/\s*sample)?", text)
+    budget_match = re.search(r"(?<![a-z0-9])(\d+)\s*(?:encoded\s*)?(?:bytes?|b)(?:\s*(?:per\s*sample|/\s*sample))?", text)
     budget = int(budget_match.group(1)) if budget_match else (80 if fixture == "clean" else 96)
     point_match = re.search(r"(?:allow|maximum|max|under|within|at most)?\s*(\d+(?:\.\d+)?)\s*(?:percentage|percent|%|pp)\s*(?:points?|point)?", text)
     if point_match:
