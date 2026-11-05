@@ -75,6 +75,10 @@ function showReport(data) {
   byId("verification").dataset.verdict = data.decision;
   byId("recommendation").textContent = labels[data.reason];
   byId("plan-contract").textContent = describeContract(data);
+  const attestation = data.attestation;
+  byId("attestation").textContent = attestation
+    ? `Independent attestation · contract ${attestation.contract_sha256.slice(0, 12)} · report ${attestation.report_sha256?.slice(0, 12) || "preflight"} · containment policy ${attestation.containment_policy_sha256.slice(0, 12)}`
+    : "No attestation was returned for this run.";
   const conflict = data.split.conflicts[0];
   byId("split-evidence").textContent = conflict
     ? `${conflict.first_split} ${conflict.first_sample} matches ${conflict.second_split} ${conflict.second_sample}.`

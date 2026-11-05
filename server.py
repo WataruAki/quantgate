@@ -2,6 +2,7 @@
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -41,7 +42,7 @@ SYSTEM_PROMPT = (
     "Do not use imports, annotations, markdown, or any other syntax."
 )
 PLANNER_PROMPT = (
-    "Turn the user's goal into a QuantGate model release plan. "
+    "Decide whether a quantized model is ready to release, then turn the goal into a QuantGate model release plan. "
     'Return only one JSON object with "fixture", "budget_bytes", and "max_drop_bps". '
     'Use "synthetic" for the default four-format comparison (FP32, FP16, BF16, INT8), '
     '"clean" for an explicit original split or Optical Digits, and "injected_overlap" for an explicit leakage demo. '
@@ -61,6 +62,23 @@ class JobError(Exception):
 
 class PublicLimitError(JobError):
     pass
+
+
+def sha256_json(value):
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+CONTAINMENT_POLICY = {
+    "network": "disabled",
+    "root_filesystem": "read-only",
+    "tmpfs": "/tmp only",
+    "user": "65534:65534",
+    "memory": "512 MiB",
+    "cpu": "1 CPU",
+    "pids": 32,
+    "tmpfs_quota": "32 MiB",
+}
 
 
 def inference_key():
@@ -326,7 +344,17 @@ def run_release(contract, live, local=False, public=False):
     mode = "local" if local else "live" if live else "example"
     if preflight.get("decision") == "block":
         trace.append("Blocked at preflight, before kernel generation and execution.")
-        return {**preflight, "mode": mode, "trace": trace}
+        return {
+            **preflight,
+            "mode": mode,
+            "trace": trace,
+            "attestation": {
+                "contract_sha256": sha256_json(contract),
+                "split_sha256": sha256_json(preflight.get("split", {})),
+                "containment_policy_sha256": sha256_json(CONTAINMENT_POLICY),
+                "containment_probe": "verified separately at /api/containment",
+            },
+        }
     if preflight.get("decision") != "continue":
         raise JobError("Release preflight did not complete.")
     trace.append("Split passed. Try the smallest feasible configuration on development first.")
@@ -354,7 +382,18 @@ def run_release(contract, live, local=False, public=False):
     if "precision_comparison" in result:
         trace.append("Reported all four formats on holdout without changing the frozen selection.")
     result["timing_ms"]["workflow"] = (time.perf_counter() - started) * 1_000
-    return {**result, "mode": mode, "trace": trace}
+    return {
+        **result,
+        "mode": mode,
+        "trace": trace,
+        "attestation": {
+            "contract_sha256": sha256_json(contract),
+            "split_sha256": sha256_json(result.get("split", {})),
+            "report_sha256": sha256_json({key: value for key, value in result.items() if key != "timing_ms"}),
+            "containment_policy_sha256": sha256_json(CONTAINMENT_POLICY),
+            "containment_probe": "verified separately at /api/containment",
+        },
+    }
 
 
 def explain_release(result, public):
