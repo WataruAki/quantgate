@@ -139,9 +139,10 @@ def reserve_public_call():
 
 
 def sandbox_command(name, args):
+    runtime = "runsc" if args and args[0].startswith("containment") else DOCKER_RUNTIME
     return [
         "docker", "run", "--rm", "--name", name, "--pull=never",
-        "--runtime", DOCKER_RUNTIME,
+        "--runtime", runtime,
         "--network=none", "--read-only", "--cap-drop=ALL",
         "--security-opt=no-new-privileges=true", "--user=65534:65534",
         "--memory=512m", "--memory-swap=512m", "--cpus=1", "--pids-limit=32",
