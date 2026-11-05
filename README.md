@@ -42,7 +42,7 @@ The orchestrator sends JSON over standard input to a disposable Docker container
 
 The accepted Python subset contains a scalar scoring function with fresh local assignments, arithmetic, and two numerical helpers. The worker maps identifiers to generated C++ names and owns the data buffers and iteration. The generated function receives two doubles. Every candidate is checked against the independent Python reference. The recorded timings separate inference, compilation, native sweep, Python reference sweep, and total workflow. The sweep timing is a single measurement and can vary between runs.
 
-Expand **Containment probe** below the prompt and select **Run containment checks**. The same worker path tests outbound network access, a write outside the writable `/tmp` tmpfs, the tmpfs quota, the PID quota and an indefinite process. The report shows the observed kernel errors, then confirms the worker exceeded the three-second deadline and was removed. Standard Docker containers share a kernel with the host.
+Expand **Containment probe** below the prompt and select **Run containment checks**. The same worker path tests outbound network access, a write outside the writable `/tmp` tmpfs, the tmpfs quota, the PID quota and an indefinite process. These security probes run through the gVisor `runsc` Docker runtime. The report shows the observed kernel errors, then confirms the worker exceeded the three-second deadline and was removed. The quantization release worker keeps the stable Docker runtime because native GCC compilation remains the critical path for the measured release result.
 
 ## Local preview
 
