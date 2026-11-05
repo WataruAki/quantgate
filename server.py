@@ -25,6 +25,7 @@ from worker import EXAMPLE, calibrate, release_job
 
 ROOT = Path(__file__).resolve().parent
 IMAGE = "quant-calibrate-worker:5"
+DOCKER_RUNTIME = os.environ.get("QUANTGATE_DOCKER_RUNTIME", "runsc")
 SLOT = BoundedSemaphore()
 MAX_BODY = 1024
 MAX_PROMPT_CHARS = 500
@@ -140,6 +141,7 @@ def reserve_public_call():
 def sandbox_command(name, args):
     return [
         "docker", "run", "--rm", "--name", name, "--pull=never",
+        "--runtime", DOCKER_RUNTIME,
         "--network=none", "--read-only", "--cap-drop=ALL",
         "--security-opt=no-new-privileges=true", "--user=65534:65534",
         "--memory=512m", "--memory-swap=512m", "--cpus=1", "--pids-limit=32",
