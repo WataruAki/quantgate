@@ -25,7 +25,7 @@ from worker import EXAMPLE, calibrate, release_job
 
 ROOT = Path(__file__).resolve().parent
 IMAGE = "quant-calibrate-worker:5"
-DOCKER_RUNTIME = os.environ.get("QUANTGATE_DOCKER_RUNTIME", "runsc")
+DOCKER_RUNTIME = os.environ.get("QUANTGATE_DOCKER_RUNTIME", "runc")
 SLOT = BoundedSemaphore()
 MAX_BODY = 1024
 MAX_PROMPT_CHARS = 500
