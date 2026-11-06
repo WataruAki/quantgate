@@ -397,6 +397,7 @@ def run_release(contract, live, local=False, public=False):
                 "contract_sha256": sha256_json(contract),
                 "split_sha256": sha256_json(preflight.get("split", {})),
                 "containment_policy_sha256": sha256_json(CONTAINMENT_POLICY),
+                "containment_runtime": "gVisor runsc",
                 "containment_probe": "verified separately at /api/containment",
             },
         }
@@ -436,6 +437,7 @@ def run_release(contract, live, local=False, public=False):
             "split_sha256": sha256_json(result.get("split", {})),
             "report_sha256": sha256_json({key: value for key, value in result.items() if key != "timing_ms"}),
             "containment_policy_sha256": sha256_json(CONTAINMENT_POLICY),
+            "containment_runtime": "gVisor runsc",
             "containment_probe": "verified separately at /api/containment",
         },
     }
