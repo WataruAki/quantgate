@@ -4,6 +4,7 @@ const byId = (id) => document.getElementById(id);
 const token = byId("token");
 const run = byId("run");
 const probe = byId("probe");
+const packageRun = byId("package-run");
 const releaseGoal = byId("release-goal");
 let report;
 let liveAccess = "unavailable";
@@ -49,6 +50,7 @@ function setBusy(busy) {
   probe.disabled = busy;
   releaseGoal.disabled = busy;
   token.disabled = busy;
+  packageRun.disabled = busy;
 }
 
 function describeContract(contract) {
@@ -197,6 +199,26 @@ probe.addEventListener("click", async () => {
       : "TIMEOUT CHECK FAILED";
     byId("containment-results").hidden = false;
     status.textContent = "All containment checks completed.";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    setBusy(false);
+  }
+});
+
+packageRun.addEventListener("click", async () => {
+  const status = byId("package-status");
+  const result = byId("package-result");
+  setBusy(true);
+  status.textContent = "Running package probe in gVisor...";
+  try {
+    const data = await request("/api/package", {
+      package: byId("package-name").value.trim(),
+      version: byId("package-version").value.trim(),
+    });
+    result.textContent = JSON.stringify(data, null, 2);
+    result.hidden = false;
+    status.textContent = `${data.verdict} · ${data.manifest_sha256.slice(0, 16)}`;
   } catch (error) {
     status.textContent = error.message;
   } finally {

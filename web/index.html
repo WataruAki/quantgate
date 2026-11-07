@@ -87,6 +87,17 @@
         <p id="timeout-result"></p>
       </div>
     </details>
+    <section class="panel" id="package-panel">
+      <h2>Package safety probe</h2>
+      <p>Run a package manifest through the same gVisor path and record blocked secret reads, network egress and root writes.</p>
+      <div class="package-fields">
+        <label>Package<input id="package-name" value="fixture-malware" maxlength="120"></label>
+        <label>Version<input id="package-version" value="1.0.0" maxlength="40"></label>
+      </div>
+      <button id="package-run" type="button" class="secondary">Run package probe</button>
+      <p id="package-status" role="status"></p>
+      <pre id="package-result" hidden></pre>
+    </section>
   </main>
 </body>
 </html>
