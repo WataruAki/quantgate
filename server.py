@@ -24,7 +24,7 @@ from worker import EXAMPLE, calibrate, release_job
 
 
 ROOT = Path(__file__).resolve().parent
-IMAGE = "quant-calibrate-worker:5"
+IMAGE = "quant-calibrate-worker:6"
 DOCKER_RUNTIME = os.environ.get("QUANTGATE_DOCKER_RUNTIME", "runc")
 SLOT = BoundedSemaphore()
 MAX_BODY = 1024
@@ -139,7 +139,7 @@ def reserve_public_call():
 
 
 def sandbox_command(name, args):
-    runtime = "runsc" if args and args[0].startswith("containment") else DOCKER_RUNTIME
+    runtime = "runsc" if args and (args[0].startswith("containment") or args[0] == "package-probe") else DOCKER_RUNTIME
     return [
         "docker", "run", "--rm", "--name", name, "--pull=never",
         "--runtime", runtime,
@@ -227,6 +227,13 @@ def run_containment_probe():
             "tmpfs_quota": "32 MiB",
         },
     }
+
+
+def run_package_probe(package, version):
+    result = run_sandbox(["package-probe"], json.dumps({"package": package, "version": version}), 12)
+    if result.get("verdict") != "DO NOT INSTALL":
+        raise JobError("Package probe did not block all representative attack behaviors.")
+    return result
 
 
 def infer_text(messages, public=False, max_tokens=1024):
@@ -546,7 +553,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply_json(404, {"error": "Page not found."})
 
     def do_POST(self):
-        if self.path not in ("/api/calibrate", "/api/plan", "/api/release", "/api/containment"):
+        if self.path not in ("/api/calibrate", "/api/plan", "/api/release", "/api/containment", "/api/package"):
             return self.reply_json(404, {"error": "Endpoint not found."})
         if self.headers.get_content_type() != "application/json":
             return self.reply_json(415, {"error": "Expected application/json."})
@@ -581,8 +588,13 @@ class Handler(BaseHTTPRequestHandler):
                     "error": "Prompt blocked by the release safety gate.",
                     "security": prompt_audit,
                 })
+        if self.path == "/api/package":
+            package = body.get("package")
+            version = body.get("version", "latest")
+            if not isinstance(package, str) or not package.strip() or not isinstance(version, str):
+                return self.reply_json(400, {"error": "Expected package and version."})
         live = self.path == "/api/plan" or body.get("mode") == "live"
-        if self.server.local_preview and (live or self.path == "/api/containment"):
+        if self.server.local_preview and (live or self.path in ("/api/containment", "/api/package")):
             return self.reply_json(503, {"error": "This action requires the Docker worker."})
         public = live and self.path in ("/api/plan", "/api/release") and live_access() == "public"
         if self.path in ("/api/calibrate", "/api/plan", "/api/release") and live and not public:
@@ -595,6 +607,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/containment":
                 result = run_containment_probe()
+            elif self.path == "/api/package":
+                result = run_package_probe(package.strip(), version.strip())
             elif self.path == "/api/plan":
                 result = generate_plan(prompt.strip(), public)
             elif self.path == "/api/release":

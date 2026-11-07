@@ -1,6 +1,7 @@
 """Compile and verify a restricted Python calibration kernel inside a worker."""
 
 import ast
+import hashlib
 import json
 import math
 import os
@@ -322,6 +323,31 @@ def containment_processes():
     return {"verdict": "unexpectedly_allowed", "children_started": len(children)}
 
 
+def package_probe(request):
+    """Exercise representative malicious-package behaviors in the worker."""
+    package = request.get("package", "fixture-malware")
+    version = request.get("version", "0.0.0")
+    manifest_hash = hashlib.sha256(f"{package}@{version}".encode()).hexdigest()
+    events = []
+    try:
+        Path("/run/secrets/aws").read_text(encoding="utf-8")
+        events.append({"type": "secret_read", "verdict": "unexpectedly_allowed"})
+    except OSError as error:
+        events.append({"type": "secret_read", "verdict": "blocked", "evidence": str(error)[:120]})
+    try:
+        with socket.create_connection(("1.1.1.1", 80), timeout=2):
+            events.append({"type": "network_egress", "verdict": "unexpectedly_allowed"})
+    except OSError as error:
+        events.append({"type": "network_egress", "verdict": "blocked", "evidence": str(error)[:120]})
+    try:
+        Path("/package-probe-write").write_text("blocked", encoding="ascii")
+        events.append({"type": "root_write", "verdict": "unexpectedly_allowed"})
+    except OSError as error:
+        events.append({"type": "root_write", "verdict": "blocked", "evidence": str(error)[:120]})
+    verdict = "DO NOT INSTALL" if all(event["verdict"] == "blocked" for event in events) else "REVIEW"
+    return {"package": package, "version": version, "manifest_sha256": manifest_hash, "events": events, "verdict": verdict}
+
+
 def release_job(request, preflight=False):
     budget, loss, fixture = validate_contract(request)
     data = load_fixture(fixture)
@@ -355,6 +381,10 @@ def main():
         return
     if mode == ["containment-processes"]:
         print(json.dumps(containment_processes()), flush=True)
+        return
+    if mode == ["package-probe"]:
+        request = json.loads(sys.stdin.buffer.read(16_385))
+        print(json.dumps(package_probe(request)), flush=True)
         return
     try:
         request = json.loads(sys.stdin.buffer.read(16_385))
