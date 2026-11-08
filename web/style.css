@@ -67,6 +67,7 @@ form, #prompt-field, #token-field { display: grid; gap: 8px; }
 label { margin-top: 5px; font-weight: 600; }
 input, textarea, button { font: inherit; border-radius: 7px; padding: 9px 12px; }
 input, textarea { min-width: 0; width: 100%; border: 1px solid #65739b; background: var(--surface); color: var(--ice); }
+input[readonly] { cursor: not-allowed; opacity: .78; }
 textarea::placeholder { color: #aab7d1; }
 textarea { resize: vertical; }
 button { border: 1px solid transparent; font-weight: 700; cursor: pointer; background: linear-gradient(110deg, var(--cyan), var(--gold)); color: #132238; }
