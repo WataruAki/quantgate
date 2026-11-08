@@ -146,6 +146,7 @@ def sandbox_command(name, args):
         "--network=none", "--read-only", "--cap-drop=ALL",
         "--security-opt=no-new-privileges=true", "--user=65534:65534",
         "--memory=512m", "--memory-swap=512m", "--cpus=1", "--pids-limit=32",
+        "--env", "QUANTGATE_PIDS_LIMIT=32",
         "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=32m,mode=1777",
         "-i", IMAGE, *args,
     ]

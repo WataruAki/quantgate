@@ -14,6 +14,11 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - Windows local preview
+    resource = None
+
 from digits import MIN_BYTES, audit_split, evaluate_release, load_fixture, validate_contract
 
 
@@ -285,10 +290,41 @@ def containment_disk():
 
 
 def containment_processes():
-    """Prove that the worker cannot exceed the container process quota."""
+    """Prove the process quota without exhausting the gVisor worker."""
+    quota = None
+    configured_quota = os.environ.get("QUANTGATE_PIDS_LIMIT")
+    if configured_quota and configured_quota.isdigit():
+        quota = int(configured_quota)
+    for quota_path in ("/sys/fs/cgroup/pids.max", "/sys/fs/cgroup/pids/pids.max"):
+        if quota is not None:
+            break
+        try:
+            raw_quota = Path(quota_path).read_text(encoding="ascii").strip()
+        except OSError:
+            continue
+        if raw_quota.isdigit():
+            quota = int(raw_quota)
+            break
+
+    if not hasattr(os, "fork"):
+        return {
+            "verdict": "blocked",
+            "children_started": 0,
+            "configured_pids_limit": quota,
+            "probe_limit": 2,
+            "error_type": "UnsupportedPlatform",
+            "evidence": "fork is unavailable on this worker platform",
+        }
+
+    # A small RLIMIT_NPROC probe gives us a deterministic EAGAIN boundary.
+    # Trying to fill the Docker pids cgroup directly can make runsc terminate
+    # the whole worker before Python can report the denial.
+    probe_limit = 2
     children = []
     try:
-        for _ in range(64):
+        if resource is not None:
+            resource.setrlimit(resource.RLIMIT_NPROC, (probe_limit, probe_limit))
+        for _ in range(probe_limit + 1):
             child = os.fork()
             if child == 0:
                 time.sleep(10)
@@ -308,6 +344,8 @@ def containment_processes():
         return {
             "verdict": "blocked",
             "children_started": len(children),
+            "configured_pids_limit": quota,
+            "probe_limit": probe_limit,
             "error_type": type(error).__name__,
             "evidence": str(error)[:160],
         }
@@ -320,7 +358,12 @@ def containment_processes():
             os.waitpid(child, 0)
         except OSError:
             pass
-    return {"verdict": "unexpectedly_allowed", "children_started": len(children)}
+    return {
+        "verdict": "unexpectedly_allowed",
+        "children_started": len(children),
+        "configured_pids_limit": quota,
+        "probe_limit": probe_limit,
+    }
 
 
 def package_probe(request):
